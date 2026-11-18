@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ILDRMS - Interactive Schema & Database Management Studio</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Custom scrollbars and styling */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
+    ::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.3); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.5); }
+    .tab-active { border-bottom: 2px solid #2563eb; color: #1d4ed8; font-weight: 600; }
+    .badge-pk { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge-fk { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
+    .badge-uk { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-sans">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md">
+          📚
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-slate-900">ILDRMS Database & Schema Studio</h1>
+          <p class="text-xs text-slate-500">Intelligent Library & Digital Resource Management System (Full CRUD & Analytics)</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+          <span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+          Connected to SQLite DB
+        </span>
+        <button onclick="refreshCurrentTable()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition flex items-center space-x-1">
+          <span>🔄</span> <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 text-sm overflow-x-auto">
+      <button onclick="switchTab('crud')" id="tab-crud" class="py-3 px-1 text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition tab-active whitespace-nowrap">
+        📝 Table Data & CRUD Operations
+      </button>
+      <button onclick="switchTab('erd')" id="tab-erd" class="py-3 px-1 text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition whitespace-nowrap">
+        🗺️ Interactive ER Diagram & Schema Map
+      </button>
+      <button onclick="switchTab('sql')" id="tab-sql" class="py-3 px-1 text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition whitespace-nowrap">
+        ⚡ Live SQL Studio & Analytics
+      </button>
+      <button onclick="switchTab('normalization')" id="tab-normalization" class="py-3 px-1 text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition whitespace-nowrap">
+        📐 Normalization Proofs (1NF - BCNF)
+      </button>
+    </div>
+  </header>
+
+  <!-- Metric Badges Overview -->
+  <div class="bg-white border-b border-slate-200 py-2.5">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
+      <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">
+        <div class="text-lg font-bold text-blue-600" id="stat-table-count">12</div>
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Normalized Tables</div>
+      </div>
+      <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">
+        <div class="text-lg font-bold text-indigo-600" id="stat-total-records">Loading...</div>
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Live Database Records</div>
+      </div>
+      <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">
+        <div class="text-lg font-bold text-emerald-600">Full CRUD</div>
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Insert / Update / Delete</div>
+      </div>
+      <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">
+        <div class="text-lg font-bold text-amber-600">ACID Safe</div>
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Foreign Key Enforcement</div>
+      </div>
+      <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">
+        <div class="text-lg font-bold text-purple-600">BCNF</div>
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Superkey Normal Form</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- ================================================================= -->
+    <!-- TAB 1: TABLE DATA & FULL CRUD OPERATIONS -->
+    <!-- ================================================================= -->
+    <div id="content-crud" class="space-y-4">
+      <!-- Table Controls Bar -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div class="flex items-center space-x-3">
+          <label for="table-selector" class="text-xs font-bold text-slate-700 whitespace-nowrap">Active Table:</label>
+          <select id="table-selector" onchange="loadTableData(this.value)" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 font-bold text-blue-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <!-- Dynamically populated -->
+          </select>
+          <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-mono font-semibold" id="table-row-count-badge">0 rows</span>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <!-- Search input -->
+          <div class="relative">
+            <input type="text" id="table-search-input" oninput="filterTableRows(this.value)" placeholder="Search records..." class="text-xs bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56">
+            <span class="absolute left-2.5 top-1.5 text-xs text-slate-400">🔍</span>
+          </div>
+
+          <!-- Add Record Button -->
+          <button onclick="openAddModal()" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow-sm transition flex items-center space-x-1.5 whitespace-nowrap">
+            <span>➕</span> <span>Add New Record</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Data Table Card -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-slate-800" id="current-table-heading">Table Records</span>
+            <span class="text-slate-400" id="current-table-pk-info"></span>
+          </div>
+          <span class="text-slate-500">Click <b>Edit</b> or <b>Delete</b> on any row to modify</span>
+        </div>
+
+        <div class="overflow-x-auto max-h-[550px]">
+          <table class="w-full text-xs text-left" id="crud-data-table">
+            <thead class="bg-slate-100 text-slate-700 font-semibold sticky top-0 border-b border-slate-200" id="crud-table-thead">
+              <!-- Headers populated via JS -->
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-mono text-slate-700" id="crud-table-tbody">
+              <!-- Rows populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- TAB 2: INTERACTIVE ER DIAGRAM & SCHEMA MAP -->
+    <!-- ================================================================= -->
+    <div id="content-erd" class="hidden space-y-6">
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900">Entity-Relationship Visual Architecture</h2>
+            <p class="text-xs text-slate-500">Click any entity card to inspect its columns, keys, and foreign relationships.</p>
+          </div>
+          <div class="flex items-center space-x-3 text-xs">
+            <span class="inline-flex items-center"><span class="w-3 h-3 rounded bg-rose-500 mr-1.5"></span> Primary Key (PK)</span>
+            <span class="inline-flex items-center"><span class="w-3 h-3 rounded bg-indigo-500 mr-1.5"></span> Foreign Key (FK)</span>
+            <span class="inline-flex items-center"><span class="w-3 h-3 rounded bg-amber-500 mr-1.5"></span> Unique Key (UK)</span>
+          </div>
+        </div>
+
+        <!-- Visual Entity Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4" id="erd-entity-grid">
+          <!-- Dynamically populated via JS -->
+        </div>
+      </div>
+
+      <!-- Selected Entity Detail Drawer -->
+      <div id="entity-detail-panel" class="bg-white p-5 rounded-xl border border-blue-200 shadow-md hidden">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+          <div class="flex items-center space-x-3">
+            <span class="text-2xl" id="drawer-icon">📄</span>
+            <div>
+              <h3 class="text-md font-bold text-slate-900" id="drawer-table-name">table_name</h3>
+              <p class="text-xs text-slate-500" id="drawer-table-desc">Table description</p>
+            </div>
+          </div>
+          <button onclick="closeDrawer()" class="text-slate-400 hover:text-slate-600 font-bold text-lg px-2">✕</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+              <tr>
+                <th class="p-2.5">Key</th>
+                <th class="p-2.5">Column Name</th>
+                <th class="p-2.5">Data Type</th>
+                <th class="p-2.5">Constraints</th>
+                <th class="p-2.5">Relationship / Reference</th>
+              </tr>
+            </thead>
+            <tbody id="drawer-table-columns" class="divide-y divide-slate-100 font-mono">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- TAB 3: LIVE SQL STUDIO & ANALYTICS -->
+    <!-- ================================================================= -->
+    <div id="content-sql" class="hidden space-y-6">
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <h2 class="text-lg font-bold text-slate-900 mb-2">Live SQL Execution Studio</h2>
+        <p class="text-xs text-slate-500 mb-4">Click any pre-built showcase query button to evaluate Joins, Correlated Subqueries, Window Functions, and Recursive CTEs.</p>
+
+        <!-- Pre-built Query Buttons -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+          <button onclick="setQuery(1)" class="p-2.5 text-left bg-slate-50 hover:bg-blue-50 hover:border-blue-300 border border-slate-200 rounded-lg transition text-xs">
+            <span class="font-bold text-blue-700 block">📊 Overdue Loans & Penalties</span>
+            <span class="text-slate-500">Calculates delayed days and overdue penalty fees</span>
+          </button>
+          <button onclick="setQuery(2)" class="p-2.5 text-left bg-slate-50 hover:bg-blue-50 hover:border-blue-300 border border-slate-200 rounded-lg transition text-xs">
+            <span class="font-bold text-indigo-700 block">🏆 Category Popularity (RANK)</span>
+            <span class="text-slate-500">Window function ranking titles by circulation count</span>
+          </button>
+          <button onclick="setQuery(3)" class="p-2.5 text-left bg-slate-50 hover:bg-blue-50 hover:border-blue-300 border border-slate-200 rounded-lg transition text-xs">
+            <span class="font-bold text-emerald-700 block">👥 Member Activity (NTILE)</span>
+            <span class="text-slate-500">Segments patrons into 4 activity quartiles</span>
+          </button>
+          <button onclick="setQuery(4)" class="p-2.5 text-left bg-slate-50 hover:bg-blue-50 hover:border-blue-300 border border-slate-200 rounded-lg transition text-xs">
+            <span class="font-bold text-purple-700 block">🌲 Recursive Category Hierarchy</span>
+            <span class="text-slate-500">Recursive CTE traversing nested disciplines</span>
+          </button>
+          <button onclick="setQuery(5)" class="p-2.5 text-left bg-slate-50 hover:bg-blue-50 hover:border-blue-300 border border-slate-200 rounded-lg transition text-xs">
+            <span class="font-bold text-amber-700 block">🔄 Hybrid Patrons (INTERSECT)</span>
+            <span class="text-slate-500">Set operation: physical + digital resource users</span>
+          </button>
+          <button onclick="setQuery(6)" class="p-2.5 text-left bg-slate-50 hover:bg-blue-50 hover:border-blue-300 border border-slate-200 rounded-lg transition text-xs">
+            <span class="font-bold text-rose-700 block">⚠️ Chronic Defaulter Risk Profile</span>
+            <span class="text-slate-500">Multi-step CTE evaluating fines and overdue items</span>
+          </button>
+        </div>
+
+        <!-- Query Editor Textarea -->
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-1">
+            <label for="sql-input" class="text-xs font-semibold text-slate-700">SQL Query Statement:</label>
+            <span class="text-xs text-slate-400 font-mono">SQLite 3 / Standard SQL</span>
+          </div>
+          <textarea id="sql-input" rows="5" class="w-full text-xs font-mono bg-slate-900 text-emerald-400 p-3 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <button onclick="executeLiveQuery()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow transition flex items-center space-x-2">
+            <span>▶️ Run SQL Query</span>
+          </button>
+          <span class="text-xs text-slate-500" id="query-execution-time">Ready</span>
+        </div>
+      </div>
+
+      <!-- Query Output Table -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <span class="font-bold text-xs text-slate-800">Query Results</span>
+          <span class="text-xs text-slate-500 font-mono" id="query-result-meta">0 rows returned</span>
+        </div>
+        <div class="overflow-x-auto max-h-[450px]">
+          <table class="w-full text-xs text-left" id="query-output-table">
+            <thead class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200" id="query-output-thead">
+              <tr><th class="p-3 text-slate-400 font-normal">Run a query to view results...</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-mono text-slate-700" id="query-output-tbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- TAB 4: NORMALIZATION (1NF - BCNF) -->
+    <!-- ================================================================= -->
+    <div id="content-normalization" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Formal Normalization Journey (1NF to BCNF)</h2>
+          <p class="text-xs text-slate-500">Mathematical progression eliminating data redundancy and modification anomalies.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <!-- 1NF Card -->
+          <div class="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-blue-900 text-sm">1NF: Atomicity</span>
+              <span class="px-2 py-0.5 bg-blue-200 text-blue-800 rounded text-[10px] font-bold">Passed</span>
+            </div>
+            <p class="text-xs text-blue-800">Eliminates repeating groups. All attribute values are atomic indivisible units.</p>
+            <div class="text-[11px] text-blue-700 bg-white p-2 rounded border border-blue-100 font-mono">
+              • Split MemberName into first_name, last_name<br>
+              • Authors list split into resource_authors bridge<br>
+              • Single barcode per book copy
+            </div>
+          </div>
+
+          <!-- 2NF Card -->
+          <div class="p-4 bg-indigo-50 border border-indigo-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-indigo-900 text-sm">2NF: No Partial FDs</span>
+              <span class="px-2 py-0.5 bg-indigo-200 text-indigo-800 rounded text-[10px] font-bold">Passed</span>
+            </div>
+            <p class="text-xs text-indigo-800">Eliminates partial dependencies on composite keys. Non-key attributes depend on entire candidate key.</p>
+            <div class="text-[11px] text-indigo-700 bg-white p-2 rounded border border-indigo-100 font-mono">
+              • In (resource_id, author_id), removed title & author bio<br>
+              • Separated book_copies from master catalog
+            </div>
+          </div>
+
+          <!-- 3NF Card -->
+          <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-emerald-900 text-sm">3NF: No Transitive FDs</span>
+              <span class="px-2 py-0.5 bg-emerald-200 text-emerald-800 rounded text-[10px] font-bold">Passed</span>
+            </div>
+            <p class="text-xs text-emerald-800">Eliminates transitive dependencies (X → Y and Y → Z). Non-key depends only on primary key.</p>
+            <div class="text-[11px] text-emerald-700 bg-white p-2 rounded border border-emerald-100 font-mono">
+              • Extracted publishers (resource → publisher_id → name)<br>
+              • Extracted categories (resource → category_id → name)<br>
+              • Extracted fines from circulation
+            </div>
+          </div>
+
+          <!-- BCNF Card -->
+          <div class="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-purple-900 text-sm">BCNF: Superkey Determinants</span>
+              <span class="px-2 py-0.5 bg-purple-200 text-purple-800 rounded text-[10px] font-bold">Achieved</span>
+            </div>
+            <p class="text-xs text-purple-800">Strict Boyce-Codd Form: in every non-trivial FD (X → Y), determinant X MUST be a superkey.</p>
+            <div class="text-[11px] text-purple-700 bg-white p-2 rounded border border-purple-100 font-mono">
+              • book_copies: both copy_id & barcode are superkeys<br>
+              • resources: both resource_id & isbn are superkeys<br>
+              • All 12 tables 100% compliant
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================================================================= -->
+  <!-- MODALS: ADD RECORD & EDIT RECORD -->
+  <!-- ================================================================= -->
+
+  <!-- Add Record Modal -->
+  <div id="modal-add-record" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900" id="modal-add-title">Add Record</h3>
+          <p class="text-xs text-slate-500">Insert a new tuple into the database</p>
+        </div>
+        <button onclick="closeModal('modal-add-record')" class="text-slate-400 hover:text-slate-600 font-bold px-2 text-lg">✕</button>
+      </div>
+
+      <form id="form-add-record" onsubmit="submitAddRecord(event)" class="p-5 overflow-y-auto space-y-3 text-xs flex-1">
+        <div id="modal-add-fields" class="space-y-3">
+          <!-- Dynamically populated fields -->
+        </div>
+
+        <div class="pt-4 border-t border-slate-200 flex items-center justify-end space-x-2">
+          <button type="button" onclick="closeModal('modal-add-record')" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold">
+            Cancel
+          </button>
+          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow">
+            Save Record
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Record Modal -->
+  <div id="modal-edit-record" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900" id="modal-edit-title">Edit Record</h3>
+          <p class="text-xs text-slate-500">Update tuple values in the database</p>
+        </div>
+        <button onclick="closeModal('modal-edit-record')" class="text-slate-400 hover:text-slate-600 font-bold px-2 text-lg">✕</button>
+      </div>
+
+      <form id="form-edit-record" onsubmit="submitEditRecord(event)" class="p-5 overflow-y-auto space-y-3 text-xs flex-1">
+        <div id="modal-edit-fields" class="space-y-3">
+          <!-- Dynamically populated fields -->
+        </div>
+
+        <div class="pt-4 border-t border-slate-200 flex items-center justify-end space-x-2">
+          <button type="button" onclick="closeModal('modal-edit-record')" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-semibold">
+            Cancel
+          </button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold shadow">
+            Update Record
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+      Intelligent Library and Digital Resource Management System (ILDRMS) • Full CRUD Database Studio
+    </div>
+  </footer>
+
+  <!-- Embedded Client Logic -->
+  <script>
+    // State variables
+    let currentTable = 'resources';
+    let currentTableData = { columns: [], column_metadata: [], primary_keys: [], rows: [] };
+    let allTableRows = [];
+    let editKeys = {};
+
+    const SCHEMA_METADATA = [
+      { name: "publishers", icon: "🏢", desc: "Publishing houses publishing books & journals", pk: "publisher_id", uk: "name", cols: 7 },
+      { name: "authors", icon: "✍️", desc: "Book authors, editors, research contributors", pk: "author_id", uk: "email", cols: 6 },
+      { name: "categories", icon: "🏷️", desc: "Hierarchical discipline taxonomy tree", pk: "category_id", uk: "category_name", cols: 4 },
+      { name: "resources", icon: "📖", desc: "Master catalog for physical books & digital assets", pk: "resource_id", uk: "isbn_issn", cols: 11 },
+      { name: "resource_authors", icon: "🔗", desc: "Bridge table resolving M:N author relationships", pk: "resource_id, author_id", uk: "-", cols: 3 },
+      { name: "book_copies", icon: "📦", desc: "Physical barcoded shelf copies & rack locations", pk: "copy_id", uk: "barcode", cols: 8 },
+      { name: "digital_assets", icon: "💻", desc: "Electronic resource files, DRM & license limits", pk: "asset_id", uk: "resource_id", cols: 8 },
+      { name: "members", icon: "🎓", desc: "Students, faculty, researchers with borrow limits", pk: "member_id", uk: "email, phone", cols: 12 },
+      { name: "circulation_transactions", icon: "🔄", desc: "Loan checkout, renewals, due dates, returns", pk: "transaction_id", uk: "-", cols: 9 },
+      { name: "reservations", icon: "⏳", desc: "Waitlist priority queues for checked-out items", pk: "reservation_id", uk: "-", cols: 7 },
+      { name: "fines_and_penalties", icon: "💰", desc: "Overdue late returns & damage penalty tickets", pk: "fine_id", uk: "transaction_id", cols: 8 },
+      { name: "fine_payments", icon: "🧾", desc: "Financial settlement receipts (UPI, Card, Net Banking)", pk: "payment_id", uk: "receipt_reference", cols: 6 }
+    ];
+
+    const PRESET_QUERIES = {
+      1: `-- Query 1: Overdue Books Audit & Calculated Late Fees
+SELECT 
+    ct.transaction_id,
+    m.first_name || ' ' || m.last_name AS delinquent_patron,
+    m.phone,
+    r.title AS resource_title,
+    ct.due_date,
+    ROUND((JULIANDAY(DATE('now')) - JULIANDAY(ct.due_date)), 0) AS days_overdue,
+    ROUND((JULIANDAY(DATE('now')) - JULIANDAY(ct.due_date)) * 10.0, 2) AS calculated_penalty_rs
+FROM circulation_transactions ct
+INNER JOIN members m ON ct.member_id = m.member_id
+INNER JOIN resources r ON ct.resource_id = r.resource_id
+WHERE ct.transaction_status = 'Overdue'
+ORDER BY days_overdue DESC;`,
+
+      2: `-- Query 2: Resource Popularity Ranking within Category (Window Function)
+WITH ResourceStats AS (
+    SELECT 
+        r.title, 
+        c.category_name, 
+        COUNT(ct.transaction_id) AS borrow_count
+    FROM resources r
+    INNER JOIN categories c ON r.category_id = c.category_id
+    LEFT JOIN circulation_transactions ct ON r.resource_id = ct.resource_id
+    GROUP BY r.resource_id, r.title, c.category_name
+)
+SELECT 
+    category_name, 
+    title, 
+    borrow_count,
+    RANK() OVER (PARTITION BY category_name ORDER BY borrow_count DESC) AS category_rank,
+    DENSE_RANK() OVER (ORDER BY borrow_count DESC) AS global_rank
+FROM ResourceStats
+ORDER BY borrow_count DESC;`,
+
+      3: `-- Query 3: Member Activity Quartiles (Window Function NTILE)
+WITH PatronVolume AS (
+    SELECT 
+        m.member_id, 
+        m.first_name || ' ' || m.last_name AS patron_name, 
+        m.member_type,
+        COUNT(ct.transaction_id) AS lifetime_loans
+    FROM members m
+    LEFT JOIN circulation_transactions ct ON m.member_id = ct.member_id
+    GROUP BY m.member_id, m.first_name, m.last_name, m.member_type
+)
+SELECT 
+    patron_name, 
+    member_type, 
+    lifetime_loans,
+    NTILE(4) OVER (ORDER BY lifetime_loans DESC) AS quartile_tier,
+    CASE NTILE(4) OVER (ORDER BY lifetime_loans DESC)
+        WHEN 1 THEN 'Tier 1: Power Reader'
+        WHEN 2 THEN 'Tier 2: Regular Borrower'
+        WHEN 3 THEN 'Tier 3: Occasional Reader'
+        WHEN 4 THEN 'Tier 4: Inactive'
+    END AS segment_label
+FROM PatronVolume
+ORDER BY lifetime_loans DESC;`,
+
+      4: `-- Query 4: Recursive Category Taxonomy (Recursive Common Table Expression)
+WITH RECURSIVE CategoryHierarchy AS (
+    SELECT 
+        category_id, 
+        category_name, 
+        parent_category_id, 
+        0 AS depth, 
+        category_name AS full_path
+    FROM categories
+    WHERE parent_category_id IS NULL
+
+    UNION ALL
+
+    SELECT 
+        c.category_id, 
+        c.category_name, 
+        c.parent_category_id, 
+        ch.depth + 1, 
+        ch.full_path || ' -> ' || c.category_name
+    FROM categories c
+    INNER JOIN CategoryHierarchy ch ON c.parent_category_id = ch.category_id
+)
+SELECT depth, full_path 
+FROM CategoryHierarchy
+ORDER BY full_path ASC;`,
+
+      5: `-- Query 5: Hybrid Patrons using Physical & Digital Resources (INTERSECT)
+SELECT m.member_id, m.first_name || ' ' || m.last_name AS patron_name, m.member_type
+FROM members m
+INNER JOIN circulation_transactions ct ON m.member_id = ct.member_id
+WHERE ct.copy_id IS NOT NULL
+
+INTERSECT
+
+SELECT m.member_id, m.first_name || ' ' || m.last_name AS patron_name, m.member_type
+FROM members m
+INNER JOIN circulation_transactions ct ON m.member_id = ct.member_id
+WHERE ct.copy_id IS NULL;`,
+
+      6: `-- Query 6: Multi-Step CTE Chronic Defaulter Risk Profile
+WITH OverdueLoans AS (
+    SELECT member_id, COUNT(*) AS overdue_books
+    FROM circulation_transactions
+    WHERE transaction_status = 'Overdue'
+    GROUP BY member_id
+),
+UnpaidPenalties AS (
+    SELECT member_id, SUM(fine_amount - paid_amount) AS pending_fines
+    FROM fines_and_penalties
+    WHERE fine_status IN ('Unpaid', 'Partially Paid')
+    GROUP BY member_id
+)
+SELECT 
+    m.member_id,
+    m.first_name || ' ' || m.last_name AS patron_name,
+    m.member_type,
+    m.membership_status,
+    COALESCE(ol.overdue_books, 0) AS overdue_books,
+    COALESCE(up.pending_fines, 0.00) AS pending_fines,
+    CASE 
+        WHEN COALESCE(up.pending_fines, 0) > 200 OR COALESCE(ol.overdue_books, 0) >= 1 THEN 'HIGH RISK - SUSPEND'
+        ELSE 'NORMAL'
+    END AS risk_tier
+FROM members m
+LEFT JOIN OverdueLoans ol ON m.member_id = ol.member_id
+LEFT JOIN UnpaidPenalties up ON m.member_id = up.member_id
+WHERE COALESCE(ol.overdue_books, 0) > 0 OR COALESCE(up.pending_fines, 0) > 0
+ORDER BY pending_fines DESC;`
+    };
+
+    // Toast Notification System
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const isSuccess = type === 'success';
+      const bgColor = isSuccess ? 'bg-emerald-600' : 'bg-rose-600';
+      const icon = isSuccess ? '✓' : '⚠️';
+
+      toast.className = `${bgColor} text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-2 text-xs font-semibold transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto max-w-md`;
+      toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // Tab Switching
+    function switchTab(tabId) {
+      ['crud', 'erd', 'sql', 'normalization'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.remove('tab-active');
+        document.getElementById(`content-${t}`).classList.add('hidden');
+      });
+      document.getElementById(`tab-${tabId}`).classList.add('tab-active');
+      document.getElementById(`content-${tabId}`).classList.remove('hidden');
+    }
+
+    // Fetch and populate table selector
+    async function loadTableList() {
+      const selector = document.getElementById('table-selector');
+      selector.innerHTML = '';
+      try {
+        const res = await fetch('/api/tables');
+        if (!res.ok) throw new Error("Offline");
+        const tables = await res.json();
+
+        let totalRecords = 0;
+        tables.forEach(t => {
+          totalRecords += t.count;
+          const opt = document.createElement('option');
+          opt.value = t.name;
+          opt.textContent = `${t.name} (${t.count} records)`;
+          if (t.name === currentTable) opt.selected = true;
+          selector.appendChild(opt);
+        });
+
+        document.getElementById('stat-total-records').textContent = `${totalRecords} Records`;
+      } catch (e) {
+        // Fallback default list
+        SCHEMA_METADATA.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.name;
+          opt.textContent = `${t.name} (12 cols)`;
+          if (t.name === currentTable) opt.selected = true;
+          selector.appendChild(opt);
+        });
+        document.getElementById('stat-total-records').textContent = '145+ (Local)';
+      }
+    }
+
+    // Load table data and render CRUD table
+    async function loadTableData(tableName) {
+      currentTable = tableName;
+      document.getElementById('current-table-heading').textContent = `Table: ${tableName}`;
+      const thead = document.getElementById('crud-table-thead');
+      const tbody = document.getElementById('crud-table-tbody');
+      thead.innerHTML = '<tr><th class="p-3">Loading...</th></tr>';
+      tbody.innerHTML = '';
+
+      try {
+        const res = await fetch(`/api/table/${tableName}`);
+        if (!res.ok) throw new Error("Failed to load table data");
+        const data = await res.json();
+        currentTableData = data;
+        allTableRows = data.rows;
+
+        document.getElementById('table-row-count-badge').textContent = `${data.rows.length} rows`;
+        document.getElementById('current-table-pk-info').textContent = `(Primary Key: ${data.primary_keys.join(', ') || 'None'})`;
+
+        renderCRUDTable(data.columns, data.rows, data.primary_keys);
+      } catch (e) {
+        thead.innerHTML = '<tr><th class="p-3 text-rose-500 font-normal">Server not reachable. Run: <code>python app/server.py</code></th></tr>';
+      }
+    }
+
+    function refreshCurrentTable() {
+      loadTableData(currentTable);
+      loadTableList();
+    }
+
+    // Render CRUD Table with Edit/Delete Buttons
+    function renderCRUDTable(columns, rows, primaryKeys) {
+      const thead = document.getElementById('crud-table-thead');
+      const tbody = document.getElementById('crud-table-tbody');
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+
+      // Header row
+      const trHead = document.createElement('tr');
+      // Actions column header
+      const thAction = document.createElement('th');
+      thAction.className = "p-2.5 text-center text-slate-800 font-bold uppercase text-[10px] tracking-wider w-24";
+      thAction.textContent = "Actions";
+      trHead.appendChild(thAction);
+
+      columns.forEach(col => {
+        const th = document.createElement('th');
+        const isPk = primaryKeys.includes(col);
+        th.className = "p-2.5 text-slate-800 font-semibold uppercase text-[10px] tracking-wider whitespace-nowrap";
+        th.innerHTML = `${col} ${isPk ? '<span class="text-rose-600 font-bold ml-0.5">(PK)</span>' : ''}`;
+        trHead.appendChild(th);
+      });
+      thead.appendChild(trHead);
+
+      if (rows.length === 0) {
+        const trEmpty = document.createElement('tr');
+        trEmpty.innerHTML = `<td colspan="${columns.length + 1}" class="p-6 text-center text-slate-400">No records found in table ${currentTable}. Click "+ Add New Record" above.</td>`;
+        tbody.appendChild(trEmpty);
+        return;
+      }
+
+      // Rows
+      rows.forEach((row, rowIndex) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-blue-50/50 transition";
+
+        // Build primary key mapping for this row
+        const rowKeys = {};
+        primaryKeys.forEach(pk => {
+          const colIdx = columns.indexOf(pk);
+          if (colIdx !== -1) rowKeys[pk] = row[colIdx];
+        });
+
+        // Actions cell (Edit & Delete)
+        const tdAction = document.createElement('td');
+        tdAction.className = "p-2.5 border-t border-slate-100 text-center whitespace-nowrap space-x-1";
+        tdAction.innerHTML = `
+          <button onclick='openEditModal(${rowIndex})' title="Edit Record" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded font-semibold text-[11px] border border-indigo-200 transition">
+            ✏️ Edit
+          </button>
+          <button onclick='confirmDeleteRecord(${JSON.stringify(rowKeys).replace(/'/g, "&apos;")})' title="Delete Record" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded font-semibold text-[11px] border border-rose-200 transition">
+            🗑️
+          </button>
+        `;
+        tr.appendChild(tdAction);
+
+        // Value cells
+        row.forEach(val => {
+          const td = document.createElement('td');
+          td.className = "p-2.5 border-t border-slate-100 whitespace-nowrap";
+          if (val === null) {
+            td.innerHTML = '<span class="text-slate-300 italic font-sans text-[10px]">NULL</span>';
+          } else {
+            td.textContent = val;
+          }
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Filter table rows by search keyword
+    function filterTableRows(query) {
+      const q = query.toLowerCase().trim();
+      if (!q) {
+        renderCRUDTable(currentTableData.columns, allTableRows, currentTableData.primary_keys);
+        return;
+      }
+      const filtered = allTableRows.filter(row => {
+        return row.some(cell => String(cell).toLowerCase().includes(q));
+      });
+      renderCRUDTable(currentTableData.columns, filtered, currentTableData.primary_keys);
+      document.getElementById('table-row-count-badge').textContent = `${filtered.length} of ${allTableRows.length} rows`;
+    }
+
+    // Open Modal to Add Record
+    function openAddModal() {
+      document.getElementById('modal-add-title').textContent = `Add Record to: ${currentTable}`;
+      const fieldsContainer = document.getElementById('modal-add-fields');
+      fieldsContainer.innerHTML = '';
+
+      currentTableData.column_metadata.forEach(col => {
+        const isPk = col.pk > 0;
+        const field = document.createElement('div');
+        field.className = "space-y-1";
+
+        let inputType = "text";
+        if (col.type.includes("INT") || col.type.includes("DECIMAL") || col.type.includes("NUMERIC")) {
+          inputType = "number";
+        } else if (col.type.includes("DATE")) {
+          inputType = "date";
+        }
+
+        field.innerHTML = `
+          <label class="block font-bold text-slate-700">
+            ${col.name} 
+            <span class="text-[10px] font-normal text-slate-400">(${col.type})</span>
+            ${col.notnull ? '<span class="text-rose-500 font-bold">*</span>' : ''}
+            ${isPk ? '<span class="badge-pk px-1 rounded text-[9px] font-bold ml-1">PK</span>' : ''}
+          </label>
+          <input type="${inputType}" name="${col.name}" ${col.notnull && !isPk ? 'required' : ''}
+            placeholder="${isPk ? 'Auto-increment or enter ID' : (col.default ? 'Default: ' + col.default : 'Enter ' + col.name)}"
+            class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
+        `;
+        fieldsContainer.appendChild(field);
+      });
+
+      document.getElementById('modal-add-record').classList.remove('hidden');
+    }
+
+    // Submit Add Record
+    async function submitAddRecord(e) {
+      e.preventDefault();
+      const form = document.getElementById('form-add-record');
+      const formData = new FormData(form);
+      const rowData = {};
+
+      formData.forEach((val, key) => {
+        if (val.trim() !== '') {
+          rowData[key] = val.trim();
+        }
+      });
+
+      try {
+        const res = await fetch(`/api/table/${currentTable}/insert`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: rowData })
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+          showToast(result.error || "Failed to insert record.", "error");
+          return;
+        }
+
+        showToast(result.message || "Record inserted successfully!");
+        closeModal('modal-add-record');
+        form.reset();
+        refreshCurrentTable();
+      } catch (err) {
+        showToast("Error connecting to server.", "error");
+      }
+    }
+
+    // Open Modal to Edit Record
+    function openEditModal(rowIndex) {
+      const row = allTableRows[rowIndex];
+      if (!row) return;
+
+      document.getElementById('modal-edit-title').textContent = `Edit Record in: ${currentTable}`;
+      const fieldsContainer = document.getElementById('modal-edit-fields');
+      fieldsContainer.innerHTML = '';
+      editKeys = {};
+
+      currentTableData.column_metadata.forEach((col, idx) => {
+        const val = row[idx];
+        const isPk = col.pk > 0;
+        if (isPk) editKeys[col.name] = val;
+
+        const field = document.createElement('div');
+        field.className = "space-y-1";
+
+        let inputType = "text";
+        if (col.type.includes("INT") || col.type.includes("DECIMAL") || col.type.includes("NUMERIC")) {
+          inputType = "number";
+        } else if (col.type.includes("DATE")) {
+          inputType = "date";
+        }
+
+        field.innerHTML = `
+          <label class="block font-bold text-slate-700">
+            ${col.name} 
+            <span class="text-[10px] font-normal text-slate-400">(${col.type})</span>
+            ${isPk ? '<span class="badge-pk px-1 rounded text-[9px] font-bold ml-1">PRIMARY KEY (Locked)</span>' : ''}
+          </label>
+          <input type="${inputType}" name="${col.name}" value="${val !== null ? val : ''}" ${isPk ? 'readonly class="w-full p-2 bg-slate-100 border border-slate-300 rounded-lg text-xs font-mono text-slate-500 cursor-not-allowed"' : 'class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"'} />
+        `;
+        fieldsContainer.appendChild(field);
+      });
+
+      document.getElementById('modal-edit-record').classList.remove('hidden');
+    }
+
+    // Submit Edit Record
+    async function submitEditRecord(e) {
+      e.preventDefault();
+      const form = document.getElementById('form-edit-record');
+      const formData = new FormData(form);
+      const updateData = {};
+
+      formData.forEach((val, key) => {
+        // Skip updating primary key
+        if (!currentTableData.primary_keys.includes(key)) {
+          updateData[key] = val.trim();
+        }
+      });
+
+      try {
+        const res = await fetch(`/api/table/${currentTable}/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keys: editKeys, data: updateData })
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+          showToast(result.error || "Failed to update record.", "error");
+          return;
+        }
+
+        showToast(result.message || "Record updated successfully!");
+        closeModal('modal-edit-record');
+        refreshCurrentTable();
+      } catch (err) {
+        showToast("Error connecting to server.", "error");
+      }
+    }
+
+    // Confirm and Delete Record
+    async function confirmDeleteRecord(keys) {
+      const keysDesc = Object.entries(keys).map(([k, v]) => `${k} = ${v}`).join(', ');
+      if (!confirm(`Are you sure you want to permanently delete record (${keysDesc}) from ${currentTable}?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/table/${currentTable}/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keys: keys })
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+          showToast(result.error || "Failed to delete record.", "error");
+          return;
+        }
+
+        showToast(result.message || "Record deleted successfully!");
+        refreshCurrentTable();
+      } catch (err) {
+        showToast("Error connecting to server.", "error");
+      }
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+    }
+
+    // Populate ERD Grid
+    function initERD() {
+      const grid = document.getElementById('erd-entity-grid');
+      grid.innerHTML = '';
+
+      SCHEMA_METADATA.forEach(table => {
+        const card = document.createElement('div');
+        card.className = "bg-slate-50 hover:bg-blue-50/50 hover:border-blue-300 border border-slate-200 rounded-xl p-4 cursor-pointer transition shadow-sm hover:shadow group";
+        card.onclick = () => openDrawer(table);
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xl">${table.icon}</span>
+            <span class="text-[10px] uppercase font-bold text-slate-400 group-hover:text-blue-600 font-mono">${table.cols} cols</span>
+          </div>
+          <h4 class="font-bold text-sm text-slate-900 group-hover:text-blue-600">${table.name}</h4>
+          <p class="text-[11px] text-slate-500 line-clamp-2 mt-1 mb-3">${table.desc}</p>
+          <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+            <span>PK: <span class="text-rose-600 font-bold">${table.pk}</span></span>
+            ${table.uk !== '-' ? `<span>UK: <span class="text-amber-600 font-bold">${table.uk}</span></span>` : ''}
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // Open Table Drawer in ERD
+    async function openDrawer(table) {
+      document.getElementById('drawer-icon').textContent = table.icon;
+      document.getElementById('drawer-table-name').textContent = table.name;
+      document.getElementById('drawer-table-desc').textContent = table.desc;
+
+      const tbody = document.getElementById('drawer-table-columns');
+      tbody.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-400">Loading columns...</td></tr>';
+
+      try {
+        const res = await fetch(`/api/table/${table.name}`);
+        const data = await res.json();
+        tbody.innerHTML = '';
+
+        data.column_metadata.forEach(col => {
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-50 transition";
+          let keyBadge = '<span class="text-slate-300">-</span>';
+          if (col.pk > 0) keyBadge = `<span class="badge-pk px-1.5 py-0.5 rounded text-[10px] font-bold">PK</span>`;
+
+          tr.innerHTML = `
+            <td class="p-2.5">${keyBadge}</td>
+            <td class="p-2.5 font-bold text-slate-900">${col.name}</td>
+            <td class="p-2.5 text-blue-600 font-semibold">${col.type}</td>
+            <td class="p-2.5 text-slate-600">${col.notnull ? 'NOT NULL' : 'NULL'} ${col.default ? `DEFAULT ${col.default}` : ''}</td>
+            <td class="p-2.5 text-indigo-600">${col.name.endsWith('_id') && !col.pk ? 'Foreign Reference' : '-'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-400">Unable to load details</td></tr>';
+      }
+
+      const panel = document.getElementById('entity-detail-panel');
+      panel.classList.remove('hidden');
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function closeDrawer() {
+      document.getElementById('entity-detail-panel').classList.add('hidden');
+    }
+
+    // Set Preset Query
+    function setQuery(num) {
+      document.getElementById('sql-input').value = PRESET_QUERIES[num] || '';
+    }
+
+    // Live Query Execution
+    async function executeLiveQuery() {
+      const query = document.getElementById('sql-input').value.trim();
+      if (!query) return;
+
+      const thead = document.getElementById('query-output-thead');
+      const tbody = document.getElementById('query-output-tbody');
+      const meta = document.getElementById('query-result-meta');
+      const timer = document.getElementById('query-execution-time');
+
+      thead.innerHTML = '<tr><th class="p-3">Executing query...</th></tr>';
+      tbody.innerHTML = '';
+      const startTime = performance.now();
+
+      try {
+        const res = await fetch('/api/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        const elapsed = (performance.now() - startTime).toFixed(1);
+        timer.textContent = `Executed in ${elapsed} ms`;
+
+        if (!res.ok) {
+          const err = await res.json();
+          thead.innerHTML = `<tr><th class="p-3 text-rose-600 font-normal">Error: ${err.error}</th></tr>`;
+          meta.textContent = "Execution failed";
+          return;
+        }
+
+        const data = await res.json();
+        meta.textContent = `${data.rows.length} rows returned`;
+
+        thead.innerHTML = '';
+        const trHead = document.createElement('tr');
+        data.columns.forEach(col => {
+          const th = document.createElement('th');
+          th.className = "p-2.5 text-slate-800 font-semibold uppercase text-[10px] tracking-wider";
+          th.textContent = col;
+          trHead.appendChild(th);
+        });
+        thead.appendChild(trHead);
+
+        data.rows.forEach(row => {
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-50";
+          row.forEach(val => {
+            const td = document.createElement('td');
+            td.className = "p-2.5 border-t border-slate-100 whitespace-nowrap";
+            td.textContent = val !== null ? val : 'NULL';
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+
+      } catch (e) {
+        timer.textContent = "Offline";
+        thead.innerHTML = `<tr><th class="p-3 text-slate-500 font-normal">Unable to connect to backend server.</th></tr>`;
+        meta.textContent = "Error";
+      }
+    }
+
+    // Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      loadTableList();
+      loadTableData(currentTable);
+      initERD();
+      setQuery(1);
+    });
+  </script>
+</body>
+</html>

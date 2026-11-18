@@ -11,7 +11,6 @@ Views, Indexes, Window Functions, and Recursive CTEs) and verifies outputs.
 import os
 import sys
 import sqlite3
-import re
 
 if hasattr(sys.stdout, "reconfigure"):
     try:

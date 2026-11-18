@@ -740,6 +740,22 @@ ORDER BY pending_fines DESC;`
       document.getElementById('table-row-count-badge').textContent = `${filtered.length} of ${allTableRows.length} rows`;
     }
 
+    const ENUM_OPTIONS = {
+      resource_type: ['Physical Book', 'E-Book', 'Journal', 'Audiobook', 'Conference Proceeding'],
+      author_role: ['Primary Author', 'Co-Author', 'Editor', 'Translator'],
+      item_condition: ['New', 'Good', 'Fair', 'Damaged', 'Lost'],
+      status: ['Available', 'Issued', 'Reserved', 'Under Maintenance'],
+      file_format: ['PDF', 'EPUB', 'MOBI', 'MP3', 'HTML'],
+      drm_protected: ['Y', 'N'],
+      member_type: ['Student', 'Faculty', 'Researcher', 'Alumni', 'Staff'],
+      membership_status: ['Active', 'Suspended', 'Expired'],
+      transaction_status: ['Active', 'Returned', 'Overdue', 'Lost'],
+      reservation_status: ['Pending', 'Fulfilled', 'Cancelled', 'Expired'],
+      fine_type: ['Overdue Late Fee', 'Damaged Item Fee', 'Lost Book Replacement Fee'],
+      fine_status: ['Unpaid', 'Partially Paid', 'Paid', 'Waived'],
+      payment_method: ['UPI', 'Credit Card', 'Debit Card', 'Net Banking', 'Cash']
+    };
+
     // Open Modal to Add Record
     function openAddModal() {
       document.getElementById('modal-add-title').textContent = `Add Record to: ${currentTable}`;
@@ -758,6 +774,23 @@ ORDER BY pending_fines DESC;`
           inputType = "date";
         }
 
+        let inputHtml = '';
+        if (ENUM_OPTIONS[col.name]) {
+          const opts = ENUM_OPTIONS[col.name].map(opt => `<option value="${opt}">${opt}</option>`).join('');
+          inputHtml = `
+            <select name="${col.name}" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">-- Select ${col.name} --</option>
+              ${opts}
+            </select>
+          `;
+        } else {
+          inputHtml = `
+            <input type="${inputType}" name="${col.name}" ${col.notnull && !isPk ? 'required' : ''}
+              placeholder="${isPk ? 'Auto-increment or enter ID' : (col.default ? 'Default: ' + col.default : 'Enter ' + col.name)}"
+              class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
+          `;
+        }
+
         field.innerHTML = `
           <label class="block font-bold text-slate-700">
             ${col.name} 
@@ -765,9 +798,7 @@ ORDER BY pending_fines DESC;`
             ${col.notnull ? '<span class="text-rose-500 font-bold">*</span>' : ''}
             ${isPk ? '<span class="badge-pk px-1 rounded text-[9px] font-bold ml-1">PK</span>' : ''}
           </label>
-          <input type="${inputType}" name="${col.name}" ${col.notnull && !isPk ? 'required' : ''}
-            placeholder="${isPk ? 'Auto-increment or enter ID' : (col.default ? 'Default: ' + col.default : 'Enter ' + col.name)}"
-            class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
+          ${inputHtml}
         `;
         fieldsContainer.appendChild(field);
       });
@@ -835,13 +866,27 @@ ORDER BY pending_fines DESC;`
           inputType = "date";
         }
 
+        let inputHtml = '';
+        if (isPk) {
+          inputHtml = `<input type="${inputType}" name="${col.name}" value="${val !== null ? String(val).replace(/"/g, '&quot;') : ''}" readonly class="w-full p-2 bg-slate-100 border border-slate-300 rounded-lg text-xs font-mono text-slate-500 cursor-not-allowed" />`;
+        } else if (ENUM_OPTIONS[col.name]) {
+          const opts = ENUM_OPTIONS[col.name].map(opt => `<option value="${opt}" ${String(val) === String(opt) ? 'selected' : ''}>${opt}</option>`).join('');
+          inputHtml = `
+            <select name="${col.name}" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              ${opts}
+            </select>
+          `;
+        } else {
+          inputHtml = `<input type="${inputType}" name="${col.name}" value="${val !== null ? String(val).replace(/"/g, '&quot;') : ''}" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />`;
+        }
+
         field.innerHTML = `
           <label class="block font-bold text-slate-700">
             ${col.name} 
             <span class="text-[10px] font-normal text-slate-400">(${col.type})</span>
             ${isPk ? '<span class="badge-pk px-1 rounded text-[9px] font-bold ml-1">PRIMARY KEY (Locked)</span>' : ''}
           </label>
-          <input type="${inputType}" name="${col.name}" value="${val !== null ? val : ''}" ${isPk ? 'readonly class="w-full p-2 bg-slate-100 border border-slate-300 rounded-lg text-xs font-mono text-slate-500 cursor-not-allowed"' : 'class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"'} />
+          ${inputHtml}
         `;
         fieldsContainer.appendChild(field);
       });

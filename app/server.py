@@ -30,9 +30,10 @@ def get_db_connection():
         # Automatically run test runner to build DB if not present
         from app.test_runner import main as build_db
         build_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA busy_timeout = 10000;")
     return conn
 
 
@@ -125,6 +126,7 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
             return None
 
     def handle_api_tables(self):
+        conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -135,14 +137,17 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
                 cursor.execute(f"SELECT COUNT(*) AS count FROM {t}")
                 count = cursor.fetchone()["count"]
                 result.append({"name": t, "count": count})
-            conn.close()
             self.send_json_response(result)
         except Exception as e:
             import traceback
             traceback.print_exc()
             self.send_json_response({"error": str(e)}, status=500)
+        finally:
+            if conn:
+                conn.close()
 
     def handle_api_table_data(self, table_name):
+        conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -171,7 +176,6 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
             # Fetch rows
             cursor.execute(f"SELECT * FROM {table_name} LIMIT 200")
             rows = [list(row) for row in cursor.fetchall()]
-            conn.close()
 
             self.send_json_response({
                 "table": table_name,
@@ -182,12 +186,16 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
             })
         except Exception as e:
             self.send_json_response({"error": str(e)}, status=500)
+        finally:
+            if conn:
+                conn.close()
 
     def handle_api_insert_record(self, table_name, row_dict):
         if not row_dict:
             self.send_json_response({"error": "No data provided for insertion."}, status=400)
             return
 
+        conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -209,7 +217,6 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
             cursor.execute(query, values)
             conn.commit()
             last_id = cursor.lastrowid
-            conn.close()
 
             self.send_json_response({
                 "success": True,
@@ -217,13 +224,19 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
                 "inserted_id": last_id
             })
         except Exception as e:
+            if conn:
+                conn.rollback()
             self.send_json_response({"error": f"Database constraint error: {str(e)}"}, status=400)
+        finally:
+            if conn:
+                conn.close()
 
     def handle_api_update_record(self, table_name, keys_dict, data_dict):
         if not keys_dict or not data_dict:
             self.send_json_response({"error": "Missing primary keys or update data."}, status=400)
             return
 
+        conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -245,7 +258,6 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
             cursor.execute(query, values)
             conn.commit()
             rows_affected = cursor.rowcount
-            conn.close()
 
             self.send_json_response({
                 "success": True,
@@ -253,13 +265,19 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
                 "rows_affected": rows_affected
             })
         except Exception as e:
+            if conn:
+                conn.rollback()
             self.send_json_response({"error": f"Database update error: {str(e)}"}, status=400)
+        finally:
+            if conn:
+                conn.close()
 
     def handle_api_delete_record(self, table_name, keys_dict):
         if not keys_dict:
             self.send_json_response({"error": "Primary key required for deletion."}, status=400)
             return
 
+        conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -271,7 +289,6 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
             cursor.execute(query, values)
             conn.commit()
             rows_affected = cursor.rowcount
-            conn.close()
 
             self.send_json_response({
                 "success": True,
@@ -279,13 +296,19 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
                 "rows_affected": rows_affected
             })
         except Exception as e:
+            if conn:
+                conn.rollback()
             self.send_json_response({"error": f"Database deletion error: {str(e)}"}, status=400)
+        finally:
+            if conn:
+                conn.close()
 
     def handle_api_execute_query(self, query):
         if not query:
             self.send_json_response({"error": "Empty SQL query provided."}, status=400)
             return
 
+        conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -295,20 +318,23 @@ class SchemaServerHandler(SimpleHTTPRequestHandler):
             if cursor.description:
                 columns = [desc[0] for desc in cursor.description]
                 rows = [list(row) for row in cursor.fetchall()]
-                conn.close()
                 self.send_json_response({
                     "columns": columns,
                     "rows": rows
                 })
             else:
                 conn.commit()
-                conn.close()
                 self.send_json_response({
                     "columns": ["Status"],
                     "rows": [["Query executed successfully (no rows returned)."]]
                 })
         except Exception as e:
+            if conn:
+                conn.rollback()
             self.send_json_response({"error": str(e)}, status=400)
+        finally:
+            if conn:
+                conn.close()
 
     def send_json_response(self, data, status=200):
         body = json.dumps(data).encode("utf-8")
